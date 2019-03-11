@@ -96,62 +96,62 @@ Census.state49$carsE %>% sum()   # pycnophylactic property is fulfilled
 # Methode 2: DAX ----
 # Daisymetric
 
-#define the source zone and the target zone
-iris_sample_with_X_spatial <- as(Census.state49, "Spatial")
-bv_sample_spatial <- as(Census.county49, "Spatial")
+#sf to spatial 
+state <- st_sf(Census.state49)
+country <- st_sf(Census.county49)
 
-source_zone <- iris_sample_with_X_spatial
-target_zone <- bv_sample_spatial
+countrysp <- as(Census.state49, "Spatial")
+statesp <- as(Census.county49, "Spatial")
 
-#Import population data at the grid level
-grid_rp <- st_read(dsn = "Data/AR_USNG/AR_USNG/AR_USNG_UTM15.shp")
-#in order to save the data
+##DAX
+#define the intersection between sources and target
+st_inter<- intersect.spdf(sources = statesp,
+                          targets = countrysp,
+                          out = "spdf")
+row.names(st_inter)<-as.character(1:length(st_inter))
 
-#transformation
-grid_rp_2154 <- st_transform(grid_rp, "+init=epsg:4238")
-grid_rp_2154 <- spTransform(grid_rp, CRS("+init=epsg:4238"))
-Census.state49<- st_transform(Census.state49, "+init=epsg:4238")
+#OBATAIN the estimation at the intersection level 
+daw_median_inter<- daw(sources = statesp,  #state as grid
+                       targets = st_inter,
+                       y= "medianincomeE",
+                       nature = "extensive", scaling =F)
 
-ind_sample <- st_intersects(as(Census.state49, "Spatial"), grid_rp_2154)
-grid_sample <- grid_rp_2154[unique(unlist(ind_sample)), ]
-
-car_db <- read.dbf("Data/AR_USNG/AR_USNG_UTM15.dbf")
-grid_sample <- merge(grid_sample, car_db, all.x = T)
-
-#We transform the sf object into a Spatial object :
-grid_sample_spatial <- as(grid_sample, "Spatial")
-
-st_inter <- intersect.spdf(sources = iris_sample_with_X_spatial,
-                           targets = bv_sample_spatial)
+choroLayer(spdf=daw_median_inter, var= "medianincomeEdaw")
+#na<-0
+daw_median_inter@data$medianincomeEdaw[is.na(daw_median_inter@data$medianincomeEdaw)]<-0
 
 
-daw_pop_intersect <- daw(sources = grid_sample_spatial,
-                         targets = st_inter,
-                         y=c("incomepercapE"),
-                         nature = "extensive", scaling = F)
+#DAX method
+# y extensive, x intensive
+daxdata<- dax(sources = statesp,
+              targets = countrysp,
+              y= "carsE",
+              st.df = daw_median_inter@data,
+              x="medianincomeEdaw",
+              scaling = F)
+head(daxdata@data)
+# resultat
+choroLayer(spdf=daxdata, var= "carsEdax")
 
-bv_sample_spatial_with_X <- dax(sources = iris_sample_with_X_spatial,
-                                targets = bv_sample_spatial_with_X,
-                                y = c("incomepercapE"),
-                                st.df = daw_pop_intersect@data,
-                                x = "femaleE",
-                                scaling = F)
+# plot the errors
+Census.county49.dax <-Census.county49 %>% 
+  mutate(ERROR_awi_cars = 
+           abs(daxdata$carsEdax - Census.county49$carsE))
+cols= carto.pal(pal1 = "red.pal",n1=20)
+plot(Census.county49.dax$geometry)
 
-choroLayer(spdf = daw_pop_intersect, var = "populationE",
-           breaks = seq(min(daw_pop_intersect$incomepercapEdaw, na.rm = T),
-                        max(daw_pop_intersect$incomepercapEdaw, na.rm = T),
+
+choroLayer(Census.county49.dax, var = "ERROR_awi_cars",
+           legend.pos = "bottomleft",
+           #legend.horiz = TRUE,
+           #legend.title.txt = NA,
+           col = cols,
+           breaks = seq(min(Census.county49.dax$ERROR_awi_cars),33240,
+                        #max(Census.county49.dax$ERROR_awi_cars),
                         length.out = 20))
 
-bv_sample_spatial_with_X <- dax(sources = iris_sample_with_X_spatial,
-                                targets = bv_sample_spatial_with_X,
-                                y = c("GEOID" ,"NAME" ,"medianageE","populationE","maleE","femaleE","pop_whiteE",   
-                                      "pop_blackE","pop_asiaE","medianincomeE","unemployedE",
-                                      "laborforceE","incomepercapE","ginicoefE",   
-                                      "carsE","bartendersE","geometry"),
-                                st.df = daw_pop_intersect@data,
-                                x = "populationE",
-                                scaling = F)
-
+title("Absolute errors of DAX method",
+      "(number of the cars)")
 
 # Methode 3: Regression ----
 # i) Intensive variable (average income: incomepercapE)
