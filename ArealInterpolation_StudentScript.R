@@ -97,11 +97,11 @@ Census.state49$carsE %>% sum()   # pycnophylactic property is fulfilled
 # Daisymetric
 
 #sf to spatial 
-state <- st_sf(Census.state49)
-country <- st_sf(Census.county49)
+state<-st_sf(Census.state49)
+country<- st_sf(Census.county49)
 
-countrysp <- as(Census.state49, "Spatial")
-statesp <- as(Census.county49, "Spatial")
+countrysp<-as(country,"Spatial")
+statesp<-as(state,"Spatial")
 
 ##DAX
 #define the intersection between sources and target
@@ -117,6 +117,7 @@ daw_median_inter<- daw(sources = statesp,  #state as grid
                        nature = "extensive", scaling =F)
 
 choroLayer(spdf=daw_median_inter, var= "medianincomeEdaw")
+
 #na<-0
 daw_median_inter@data$medianincomeEdaw[is.na(daw_median_inter@data$medianincomeEdaw)]<-0
 
@@ -130,29 +131,28 @@ daxdata<- dax(sources = statesp,
               x="medianincomeEdaw",
               scaling = F)
 head(daxdata@data)
+
 # resultat
 choroLayer(spdf=daxdata, var= "carsEdax")
 
-# plot the errors
+#######################
+#the error
 Census.county49.dax <-Census.county49 %>% 
-  mutate(ERROR_awi_cars = 
+  mutate(ERROR_dax_cars = 
            abs(daxdata$carsEdax - Census.county49$carsE))
 cols= carto.pal(pal1 = "red.pal",n1=20)
-plot(Census.county49.dax$geometry)
 
-
-choroLayer(Census.county49.dax, var = "ERROR_awi_cars",
+choroLayer(Census.county49.dax, var = "ERROR_dax_cars",
            legend.pos = "bottomleft",
            #legend.horiz = TRUE,
            #legend.title.txt = NA,
            col = cols,
-           breaks = seq(min(Census.county49.dax$ERROR_awi_cars),33240,
+           breaks = seq(min(Census.county49.dax$ERROR_dax_cars),33240,
                         #max(Census.county49.dax$ERROR_awi_cars),
                         length.out = 20))
 
 title("Absolute errors of DAX method",
       "(number of the cars)")
-
 # Methode 3: Regression ----
 # i) Intensive variable (average income: incomepercapE)
 
